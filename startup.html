@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StreamVault</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f0f0f;--surface:#161616;--card:#1c1c1c;--card-h:#262626;
+  --border:#252525;--red:#e50914;--red-d:#b20710;
+  --text:#fff;--muted:#b3b3b3;--dim:#555;--sw:210px;--hh:58px;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:#2e2e2e;border-radius:3px}
+
+/* ── SETUP ── */
+#setup{position:fixed;inset:0;z-index:900;background:radial-gradient(ellipse at 50% 38%,#1c0f3a 0%,#070707 68%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:40px;text-align:center}
+#setup.hidden{display:none}
+#slogo{font-size:46px;font-weight:900;letter-spacing:-2px;color:var(--red);line-height:1}
+#slogo span{color:#fff}
+#setup h2{font-size:24px;font-weight:700;color:#fff}
+#setup p{color:var(--muted);font-size:14px;max-width:400px;line-height:1.8}
+#sbtn{background:var(--red);color:#fff;border:none;padding:14px 36px;border-radius:6px;
+  font-size:16px;font-weight:700;cursor:pointer;transition:background .2s,transform .15s,box-shadow .2s;
+  box-shadow:0 4px 22px rgba(229,9,20,.4)}
+#sbtn:hover{background:var(--red-d);transform:translateY(-2px);box-shadow:0 8px 28px rgba(229,9,20,.5)}
+#sbtn:active{transform:translateY(0)}
+#sdrive{font-size:12px;color:var(--dim)}
+#serr{color:#ff6b6b;font-size:13px;display:none;max-width:340px}
+
+/* ── APP ── */
+#app{display:flex;flex-direction:column;height:100vh}
+#app.hidden{display:none}
+
+/* ── HEADER ── */
+#hdr{height:var(--hh);flex-shrink:0;background:rgba(10,10,10,.97);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 16px;gap:12px;z-index:50;position:relative}
+#logo{font-size:20px;font-weight:900;letter-spacing:-1px;color:var(--red);flex-shrink:0;cursor:pointer;user-select:none}
+#logo span{color:#fff}
+#sw{flex:1;max-width:460px;position:relative}
+#si{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--dim);pointer-events:none;width:15px;height:15px}
+#src{width:100%;background:#1a1a1a;border:1px solid var(--border);color:var(--text);
+  padding:8px 12px 8px 34px;border-radius:18px;font-size:14px;outline:none;transition:border-color .2s}
+#src:focus{border-color:#444}
+#src::placeholder{color:var(--dim)}
+#badge{margin-left:auto;font-size:11px;color:var(--dim);background:#1a1a1a;border:1px solid var(--border);
+  padding:4px 11px;border-radius:10px;flex-shrink:0;white-space:nowrap}
+#rescan{background:transparent;border:1px solid var(--border);color:var(--muted);padding:5px 12px;
+  border-radius:4px;font-size:12px;cursor:pointer;flex-shrink:0;transition:border-color .2s,color .2s}
+#rescan:hover{border-color:#666;color:#fff}
+
+/* ── BODY ── */
+#body{display:flex;flex:1;overflow:hidden}
+
+/* ── SIDEBAR ── */
+#sidebar{width:var(--sw);flex-shrink:0;background:var(--surface);border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow-y:auto;padding:12px 0}
+#nav-tabs{display:flex;flex-direction:column;flex:1}
+.tbtn{background:none;border:none;color:var(--muted);padding:11px 20px;font-size:13px;font-weight:500;
+  cursor:pointer;text-align:left;transition:color .18s,background .18s;position:relative;width:100%;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.tbtn:hover{color:#fff;background:rgba(255,255,255,.04)}
+.tbtn.active{color:#fff;font-weight:700}
+.tbtn.active::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);
+  width:3px;height:55%;background:var(--red);border-radius:0 2px 2px 0}
+#sf{padding:14px 20px;font-size:11px;color:var(--dim);line-height:1.8;border-top:1px solid var(--border);flex-shrink:0}
+
+/* ── CONTENT ── */
+#content{flex:1;overflow-y:auto;padding:20px}
+
+/* loading */
+#ls{display:none;flex-direction:column;align-items:center;justify-content:center;height:65vh;gap:14px}
+#ls.v{display:flex}
+.spin{width:36px;height:36px;border:3px solid #2a2a2a;border-top-color:var(--red);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#lt{color:var(--muted);font-size:13px;max-width:300px;text-align:center;line-height:1.5}
+#lpb{width:260px;height:2px;background:#1e1e1e;border-radius:1px;overflow:hidden}
+#lbar{height:100%;background:var(--red);border-radius:1px;width:0%;transition:width .3s}
+
+/* grid */
+#gv{display:none}
+#gv.v{display:block}
+#gt{font-size:20px;font-weight:700;margin-bottom:16px;color:#e0e0e0}
+#gc{font-size:13px;color:var(--muted);font-weight:400;margin-left:8px}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(145px,1fr));gap:12px}
+
+/* card */
+.card{cursor:pointer;border-radius:7px;overflow:hidden;background:var(--card);
+  transition:transform .18s,box-shadow .18s;position:relative}
+.card:hover{transform:translateY(-5px) scale(1.025);box-shadow:0 16px 36px rgba(0,0,0,.7)}
+.cp{width:100%;aspect-ratio:2/3;display:flex;align-items:center;justify-content:center;
+  position:relative;overflow:hidden;font-size:36px;font-weight:900;color:rgba(255,255,255,.12);letter-spacing:-1px}
+.cp img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cp-ov{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.85) 0%,transparent 55%);opacity:0;transition:opacity .18s}
+.card:hover .cp-ov{opacity:1}
+.cpb{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .18s}
+.card:hover .cpb{opacity:1}
+.cpb-c{width:46px;height:46px;background:rgba(255,255,255,.92);border-radius:50%;display:flex;
+  align-items:center;justify-content:center;transform:scale(.75);transition:transform .18s}
+.card:hover .cpb-c{transform:scale(1)}
+.cbadge{position:absolute;top:7px;right:7px;background:rgba(229,9,20,.88);color:#fff;
+  font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:.5px}
+.cpbar{position:absolute;bottom:0;left:0;height:3px;background:var(--red);border-radius:0}
+.ci{padding:8px 9px 10px}
+.cn{font-size:12px;font-weight:600;color:#e0e0e0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px}
+.cm{font-size:10px;color:var(--dim)}
+
+/* empty */
+#es{display:none;text-align:center;padding:60px 20px;color:var(--muted)}
+#es.v{display:block}
+#es h3{font-size:18px;color:#888;margin-bottom:8px}
+
+/* show detail */
+#sv{display:none}
+#sv.v{display:block}
+#sb{background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;
+  padding:0 0 14px;display:inline-flex;align-items:center;gap:6px;transition:color .18s}
+#sb:hover{color:#fff}
+#sh{display:flex;gap:20px;margin-bottom:24px;flex-wrap:wrap}
+#sp{width:140px;min-width:140px;aspect-ratio:2/3;border-radius:7px;overflow:hidden;flex-shrink:0;
+  display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900;color:rgba(255,255,255,.18)}
+#sp img{width:100%;height:100%;object-fit:cover}
+#sm{padding-top:4px;min-width:0}
+#stitle{font-size:24px;font-weight:900;margin-bottom:6px;line-height:1.2}
+#sepc{font-size:13px;color:var(--muted);margin-bottom:14px}
+#spf{background:#fff;color:#000;border:none;padding:9px 22px;border-radius:5px;font-size:13px;
+  font-weight:700;cursor:pointer;transition:background .18s}
+#spf:hover{background:rgba(255,255,255,.82)}
+.sblock{margin-bottom:12px}
+.shdr{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface);border-radius:6px;
+  cursor:pointer;user-select:none;border:1px solid var(--border);transition:background .18s;margin-bottom:1px}
+.shdr:hover{background:var(--card-h)}
+.sname{font-size:13px;font-weight:700;flex:1}
+.scnt{font-size:11px;color:var(--muted)}
+.sarr{font-size:11px;color:var(--dim);transition:transform .18s}
+.shdr.col .sarr{transform:rotate(-90deg)}
+.elist{border:1px solid var(--border);border-top:none;border-radius:0 0 6px 6px;overflow:hidden}
+.eitem{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;
+  transition:background .15s;border-bottom:1px solid rgba(255,255,255,.035)}
+.eitem:last-child{border-bottom:none}
+.eitem:hover{background:var(--card-h)}
+.enum{font-size:11px;color:var(--dim);min-width:24px;text-align:right;flex-shrink:0}
+.ename{font-size:12px;color:var(--muted);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.eitem:hover .ename{color:#fff}
+.eext{font-size:10px;color:var(--dim);text-transform:uppercase;flex-shrink:0}
+.esz{font-size:10px;color:var(--dim);flex-shrink:0}
+.epr{width:36px;height:3px;background:#2a2a2a;border-radius:2px;flex-shrink:0}
+.epr-f{height:100%;background:var(--red);border-radius:2px}
+.eplay{opacity:0;color:var(--red);font-size:14px;flex-shrink:0}
+.eitem:hover .eplay{opacity:1}
+
+/* ── PLAYER ── */
+#player{display:none;position:fixed;inset:0;z-index:800;background:#000;flex-direction:column}
+#player.v{display:flex}
+#ph{position:absolute;top:0;left:0;right:0;padding:12px 16px;display:flex;align-items:center;gap:12px;
+  background:linear-gradient(to bottom,rgba(0,0,0,.9) 0%,transparent 100%);z-index:10;opacity:0;transition:opacity .3s}
+#player.ui #ph{opacity:1}
+#pcl{background:rgba(255,255,255,.1);border:none;color:#fff;width:34px;height:34px;border-radius:50%;
+  font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:background .18s;flex-shrink:0}
+#pcl:hover{background:rgba(255,255,255,.22)}
+#pfn{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff}
+#vc{flex:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
+#vid{width:100%;height:100%;object-fit:contain;cursor:pointer;display:block}
+#perr{display:none;position:absolute;inset:0;background:rgba(0,0,0,.93);flex-direction:column;
+  align-items:center;justify-content:center;gap:12px;text-align:center;padding:40px;z-index:5}
+#perr.v{display:flex}
+#perr h3{font-size:18px;color:#fff}
+#perr p{color:var(--muted);font-size:13px;max-width:380px;line-height:1.7}
+#perr code{font-size:12px;color:var(--red);background:rgba(229,9,20,.1);padding:3px 9px;border-radius:3px}
+#pc{position:absolute;bottom:0;left:0;right:0;padding:40px 18px 16px;
+  background:linear-gradient(to top,rgba(0,0,0,.93) 0%,transparent 100%);opacity:0;transition:opacity .3s}
+#player.ui #pc{opacity:1}
+#pbw{height:16px;display:flex;align-items:center;cursor:pointer;margin-bottom:8px;position:relative}
+#pt{width:100%;height:4px;background:rgba(255,255,255,.22);border-radius:2px;position:relative;transition:height .12s}
+#pbw:hover #pt{height:6px}
+#pbb{position:absolute;top:0;left:0;height:100%;background:rgba(255,255,255,.18);border-radius:2px;width:0%}
+#pf{position:absolute;top:0;left:0;height:100%;background:var(--red);border-radius:2px;width:0%}
+#pf::after{content:'';position:absolute;right:-5px;top:50%;transform:translateY(-50%);
+  width:11px;height:11px;background:#fff;border-radius:50%;opacity:0;transition:opacity .12s}
+#pbw:hover #pf::after{opacity:1}
+#ptt{position:absolute;bottom:calc(100% + 6px);background:rgba(0,0,0,.8);color:#fff;
+  padding:2px 7px;border-radius:3px;font-size:11px;pointer-events:none;opacity:0;transform:translateX(-50%);white-space:nowrap}
+#pbw:hover #ptt{opacity:1}
+.cr{display:flex;align-items:center;gap:8px}
+.cbtn{background:none;border:none;color:#fff;cursor:pointer;padding:5px;border-radius:4px;
+  display:flex;align-items:center;justify-content:center;opacity:.8;transition:opacity .18s,background .18s;flex-shrink:0}
+.cbtn:hover{opacity:1;background:rgba(255,255,255,.1)}
+#ctm{font-size:12px;color:rgba(255,255,255,.7);font-variant-numeric:tabular-nums;white-space:nowrap}
+#vw{display:flex;align-items:center;gap:6px}
+#cvol{-webkit-appearance:none;width:64px;height:4px;background:rgba(255,255,255,.28);border-radius:2px;outline:none;cursor:pointer}
+#cvol::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;background:#fff;cursor:pointer}
+.fs{flex:1}
+#cspd{font-size:11px;font-weight:700;border:1px solid rgba(255,255,255,.28);border-radius:3px;padding:3px 7px}
+
+/* ── TOAST ── */
+#toast{position:fixed;bottom:20px;right:20px;z-index:9999;background:rgba(22,22,22,.97);color:#fff;
+  padding:9px 16px;border-radius:6px;border-left:3px solid var(--red);font-size:13px;
+  opacity:0;transform:translateY(6px);transition:opacity .22s,transform .22s;pointer-events:none;max-width:260px}
+#toast.s{opacity:1;transform:translateY(0)}
+
+@media(max-width:640px){
+  :root{--sw:150px}
+  #grid{grid-template-columns:repeat(auto-fill,minmax(110px,1fr))}
+  #badge,#rescan{display:none}
+  .tbtn{font-size:12px;padding:10px 14px}
+}
+</style>
+</head>
+<body>
+
+<!-- SETUP OVERLAY -->
+<div id="setup">
+  <div id="slogo">STREAM<span>VAULT</span></div>
+  <h2>Your Personal Theater</h2>
+  <p>Stream your entire local collection directly from your drive.<br>No uploads. No cloud. Fully offline.</p>
+  <button id="sbtn">Connect Drive</button>
+  <div id="sdrive">Detected: <strong id="dlabel">—</strong></div>
+  <div id="serr"></div>
+</div>
+
+<!-- APP SHELL -->
+<div id="app" class="hidden">
+  <header id="hdr">
+    <div id="logo">STREAM<span>VAULT</span></div>
+    <div id="sw">
+      <svg id="si" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="src" placeholder="Search titles…" autocomplete="off" spellcheck="false">
+    </div>
+    <div id="badge">Connected</div>
+    <button id="rescan">↻ Rescan</button>
+  </header>
+
+  <div id="body">
+    <nav id="sidebar">
+      <div id="nav-tabs"></div>
+      <div id="sf"></div>
+    </nav>
+
+    <main id="content">
+      <!-- Loading -->
+      <div id="ls">
+        <div class="spin"></div>
+        <div id="lt">Scanning…</div>
+        <div id="lpb"><div id="lbar"></div></div>
+      </div>
+
+      <!-- Grid -->
+      <div id="gv">
+        <div id="gt">Library <span id="gc"></span></div>
+        <div id="grid"></div>
+        <div id="es"><h3>Nothing here</h3><p id="es-p"></p></div>
+      </div>
+
+      <!-- Show Detail -->
+      <div id="sv">
+        <button id="sb">← Back</button>
+        <div id="sh">
+          <div id="sp"></div>
+          <div id="sm">
+            <div id="stitle"></div>
+            <div id="sepc"></div>
+            <button id="spf">▶ Play First Episode</button>
+          </div>
+        </div>
+        <div id="slist"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- PLAYER -->
+<div id="player">
+  <div id="ph">
+    <button id="pcl">✕</button>
+    <span id="pfn"></span>
+  </div>
+  <div id="vc">
+    <video id="vid" preload="metadata"></video>
+    <div id="perr">
+      <h3>Playback Error</h3>
+      <p>This format cannot be played natively in your browser.</p>
+      <p><code id="errfn"></code></p>
+      <p>Chrome/Edge natively support: <strong>MP4 (H.264/H.265), WebM, MOV</strong>.<br>
+         MKV and AVI may work if your browser has the required codec installed.</p>
+    </div>
+  </div>
+  <div id="pc">
+    <div id="pbw">
+      <div id="pt"><div id="pbb"></div><div id="pf"></div></div>
+      <div id="ptt">0:00</div>
+    </div>
+    <div class="cr">
+      <button class="cbtn" id="cplay">
+        <svg id="i-play" width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+        <svg id="i-pause" width="22" height="22" viewBox="0 0 24 24" fill="currentColor" style="display:none"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+      </button>
+      <button class="cbtn" id="cb10" title="Back 10s">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.33"/>
+          <text x="8.5" y="15.5" fill="currentColor" stroke="none" font-size="6" font-weight="900" font-family="Arial">10</text>
+        </svg>
+      </button>
+      <button class="cbtn" id="cf10" title="Forward 10s">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.49-3.33"/>
+          <text x="8.5" y="15.5" fill="currentColor" stroke="none" font-size="6" font-weight="900" font-family="Arial">10</text>
+        </svg>
+      </button>
+      <div id="vw">
+        <button class="cbtn" id="cmute">
+          <svg id="i-vol" width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+          <svg id="i-mute" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="display:none"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg>
+        </button>
+        <input type="range" id="cvol" min="0" max="1" step="0.05" value="1">
+      </div>
+      <span id="ctm">0:00 / 0:00</span>
+      <div class="fs"></div>
+      <button class="cbtn" id="cspd">1×</button>
+      <button class="cbtn" id="cfs" title="Fullscreen (F)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════
+const VIDEO_EXTS = new Set(['mp4','m4v','webm','ogv','ogg','mov','mkv','avi','wmv','flv','mpg','mpeg','ts','m2ts','3gp','divx']);
+const IMG_EXTS   = new Set(['jpg','jpeg','png','webp']);
+const SPEEDS     = [0.5, 0.75, 1, 1.25, 1.5, 2];
+const SKIP_DIRS  = new Set([
+  '$recycle.bin','system volume information','windows','program files',
+  'program files (x86)','programdata','recovery','boot','efi','perflogs',
+  'msdownld.tmp','config.msi'
+]);
+const GRADS = [
+  ['#1a1a2e','#16213e'],['#2d1b69','#0d7377'],['#141e30','#243b55'],
+  ['#3d0c11','#8b1a1a'],['#0d2137','#1e5f74'],['#1a2a1a','#2d5a27'],
+  ['#2c1654','#4a1942'],['#0b3d59','#1a6985'],['#3d1a00','#7a3800'],
+  ['#1a0533','#4a0e8f'],['#003333','#006666'],['#1a1a00','#4d4d00'],
+];
+
+// ═══════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════
+let rootHandle  = null;
+let library     = [];   // [{ name, shows:[] }]
+let currentCat  = null;
+let currentFile = null;
+let blobURLs    = new Map();  // file.id → blob URL
+let watchProg   = {};         // file.id → { time, duration, pct, ts }
+let speedIdx    = 2;
+let uiTimer     = null;
+let scanCount   = 0;
+let db          = null;
+
+// ═══════════════════════════════════════════════════════════
+// UTILS
+// ═══════════════════════════════════════════════════════════
+const $   = id => document.getElementById(id);
+const esc = s  => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+function detectDrive() {
+  const m = location.href.match(/^file:\/\/\/([A-Za-z]:)\//);
+  return m ? m[1].toUpperCase() + ':\\' : 'Local Drive';
+}
+
+function fmt(s) {
+  if (!isFinite(s) || s < 0) return '0:00';
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60);
+  return h ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
+}
+const pad = n => String(n).padStart(2, '0');
+
+function fmtSz(b) {
+  if (!b) return '';
+  if (b >= 1e12) return (b/1e12).toFixed(1) + ' TB';
+  if (b >= 1e9)  return (b/1e9).toFixed(1)  + ' GB';
+  if (b >= 1e6)  return (b/1e6).toFixed(1)  + ' MB';
+  return (b/1e3).toFixed(0) + ' KB';
+}
+
+// Clean episode filename for display
+function cleanEp(filename) {
+  return filename
+    .replace(/\.[^.]+$/, '')                  // remove extension
+    .replace(/\[[0-9A-F]{6,8}\]/gi, '')       // remove checksums like [BF5EF159]
+    .replace(/^\s*\[[^\]]{1,20}\]\s*/,'')     // remove leading group tags [GroupName]
+    .replace(/[._]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim() || filename.replace(/\.[^.]+$/, '');
+}
+
+function gradFor(name) {
+  let h = 0;
+  for (const c of name) h = (h * 31 + c.charCodeAt(0)) & 0x7fffffff;
+  const g = GRADS[h % GRADS.length];
+  return `linear-gradient(150deg,${g[0]} 0%,${g[1]} 100%)`;
+}
+
+function initials(name) {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || '?';
+}
+
+function skipEntry(name) {
+  return name.startsWith('.') || name.startsWith('$') || SKIP_DIRS.has(name.toLowerCase());
+}
+
+function natSort(a, b) {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+let toastT;
+function toast(msg) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('s');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => el.classList.remove('s'), 3500);
+}
+
+// ═══════════════════════════════════════════════════════════
+// INDEXEDDB
+// ═══════════════════════════════════════════════════════════
+async function openDB() {
+  return new Promise(res => {
+    const r = indexedDB.open('StreamVault', 1);
+    r.onupgradeneeded = e => e.target.result.createObjectStore('kv');
+    r.onsuccess = e => { db = e.target.result; res(); };
+    r.onerror = () => res();
+  });
+}
+function dbSet(k, v) {
+  return new Promise(res => {
+    if (!db) return res();
+    const tx = db.transaction('kv', 'readwrite');
+    tx.objectStore('kv').put(v, k);
+    tx.oncomplete = res; tx.onerror = res;
+  });
+}
+function dbGet(k) {
+  return new Promise(res => {
+    if (!db) return res(null);
+    const tx = db.transaction('kv', 'readonly');
+    const r = tx.objectStore('kv').get(k);
+    r.onsuccess = () => res(r.result ?? null);
+    r.onerror = () => res(null);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// USAGE LOG
+// ═══════════════════════════════════════════════════════════
+async function logUsage(event, filename = '') {
+  if (!rootHandle) return;
+  try {
+    const now = new Date();
+    const entry = {
+      date: now.toISOString().slice(0, 10),
+      time: now.toTimeString().slice(0, 8),
+      event,
+      filename
+    };
+    let data = [];
+    try {
+      const fh  = await rootHandle.getFileHandle('usage-log.json');
+      const txt = await (await fh.getFile()).text();
+      const parsed = JSON.parse(txt);
+      if (Array.isArray(parsed)) data = parsed;
+    } catch {}
+    data.push(entry);
+    const fh = await rootHandle.getFileHandle('usage-log.json', { create: true });
+    const w  = await fh.createWritable();
+    await w.write(JSON.stringify(data, null, 2));
+    await w.close();
+  } catch (e) {
+    console.warn('[StreamVault] log error:', e.message);
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// SCANNING — smart recursive classifier
+// ═══════════════════════════════════════════════════════════
+
+// Collect all video FileHandles directly inside a directory
+async function getVideos(dh, basePath) {
+  const out = [];
+  try {
+    for await (const [name, h] of dh.entries()) {
+      if (h.kind !== 'file') continue;
+      const ext = name.split('.').pop().toLowerCase();
+      if (!VIDEO_EXTS.has(ext)) continue;
+      let size = 0;
+      try { size = (await h.getFile()).size; } catch {}
+      out.push({
+        id:       `${basePath}/${name}`,
+        name:     cleanEp(name),
+        filename: name,
+        handle:   h,
+        ext,
+        size
+      });
+    }
+  } catch {}
+  return out.sort((a, b) => natSort(a.filename, b.filename));
+}
+
+/*
+  classify(dh, folderName, path, depth)
+  Returns one of:
+    { type:'show',     id, name, handle, posterHandle, videos, seasons, totalEps, isMovie }
+    { type:'category', id, name, handle, shows, subCats }
+    { type:'meta',     cats }          ← pass-through container (e.g. E:\Videos\)
+    null                               ← empty / skip
+*/
+async function classify(dh, folderName, parentPath, depth) {
+  if (depth > 7) return null;
+
+  const curPath = parentPath ? `${parentPath}/${folderName}` : folderName;
+  const directVideos = [];
+  const subDirs      = [];
+  let   posterHandle = null;
+
+  try {
+    for await (const [name, h] of dh.entries()) {
+      if (skipEntry(name)) continue;
+      if (h.kind === 'file') {
+        const ext = name.split('.').pop().toLowerCase();
+        if (VIDEO_EXTS.has(ext)) {
+          let size = 0;
+          try { size = (await h.getFile()).size; } catch {}
+          directVideos.push({
+            id:       `${curPath}/${name}`,
+            name:     cleanEp(name),
+            filename: name,
+            handle:   h,
+            ext,
+            size
+          });
+        } else if (IMG_EXTS.has(ext) && /^(poster|cover|folder|thumb)/i.test(name)) {
+          posterHandle = h;
+        }
+      } else {
+        subDirs.push({ name, handle: h });
+      }
+    }
+  } catch { return null; }
+
+  directVideos.sort((a, b) => natSort(a.filename, b.filename));
+
+  // ── CASE 1: Folder has direct videos → it IS a show ──────────────────────
+  if (directVideos.length > 0) {
+    // Check subfolders for season content
+    const seasons = [];
+    for (const { name: sn, handle: sh } of subDirs) {
+      const sv = await getVideos(sh, `${curPath}/${sn}`);
+      if (sv.length > 0) seasons.push({ name: sn, handle: sh, videos: sv });
+    }
+    seasons.sort((a, b) => natSort(a.name, b.name));
+
+    const totalEps = directVideos.length + seasons.reduce((n, s) => n + s.videos.length, 0);
+    scanCount++;
+    $('lt').textContent = `Found ${scanCount} items…`;
+    $('lbar').style.width = Math.min(90, scanCount * 2) + '%';
+
+    return {
+      type:         'show',
+      id:           curPath,
+      name:         folderName,
+      handle:       dh,
+      posterHandle,
+      videos:       directVideos,
+      seasons,
+      totalEps,
+      // A single video with no seasons = treat as a standalone movie card
+      isMovie:      totalEps === 1 && seasons.length === 0
+    };
+  }
+
+  // ── CASE 2: No direct videos — recurse into subfolders ───────────────────
+  if (subDirs.length === 0) return null;
+
+  const children = [];
+  for (const { name: dn, handle: dh2 } of subDirs) {
+    const child = await classify(dh2, dn, curPath, depth + 1);
+    if (child) children.push(child);
+  }
+  if (children.length === 0) return null;
+
+  const shows = children.filter(c => c.type === 'show');
+  const cats  = children.filter(c => c.type === 'category');
+  const metas = children.filter(c => c.type === 'meta');
+
+  // Has show children → this folder is a CATEGORY
+  if (shows.length > 0) {
+    return {
+      type:     'category',
+      id:       curPath,
+      name:     folderName,
+      handle:   dh,
+      shows,
+      subCats:  [...cats, ...metas.flatMap(m => m.cats)]
+    };
+  }
+
+  // Has only category/meta children → pass-through META container
+  if (cats.length > 0 || metas.length > 0) {
+    return {
+      type: 'meta',
+      cats: [...cats, ...metas.flatMap(m => m.cats)]
+    };
+  }
+
+  return null;
+}
+
+async function scanLibrary() {
+  showLoad('Scanning drive…');
+  library   = [];
+  scanCount = 0;
+  blobURLs.forEach(url => URL.revokeObjectURL(url));
+  blobURLs  = new Map();
+
+  const orphanShows = [];
+
+  try {
+    const topDirs = [];
+    for await (const [name, h] of rootHandle.entries()) {
+      if (skipEntry(name) || h.kind !== 'directory') continue;
+      topDirs.push({ name, handle: h });
+    }
+
+    for (let i = 0; i < topDirs.length; i++) {
+      const { name, handle } = topDirs[i];
+      $('lt').textContent = `Scanning ${name}…`;
+      $('lbar').style.width = (5 + (i / topDirs.length) * 80) + '%';
+
+      const result = await classify(handle, name, '', 0);
+      if (!result) continue;
+
+      switch (result.type) {
+        case 'show':
+          orphanShows.push(result);
+          break;
+        case 'category':
+          library.push(result);
+          // Sub-categories become their own top-level tabs
+          if (result.subCats?.length) library.push(...result.subCats);
+          break;
+        case 'meta':
+          library.push(...result.cats);
+          break;
+      }
+    }
+  } catch (e) {
+    toast('Scan error: ' + e.message);
+    console.error(e);
+  }
+
+  // Shows found directly in root → implicit category
+  if (orphanShows.length > 0) {
+    library.unshift({
+      type:    'category',
+      name:    rootHandle.name || 'Library',
+      shows:   orphanShows,
+      subCats: []
+    });
+  }
+
+  $('lbar').style.width = '100%';
+
+  const totalShows = library.reduce((n, c) => n + (c.shows?.length || 0), 0);
+  $('sf').innerHTML = `<strong style="color:var(--muted)">${totalShows}</strong> titles &nbsp;·&nbsp; <strong style="color:var(--muted)">${library.length}</strong> categories`;
+
+  buildSidebar();
+
+  if (library.length > 0) {
+    currentCat = library[0].name;
+    renderCat(currentCat);
+  } else {
+    hideLoad();
+    $('gv').classList.add('v');
+    $('es').classList.add('v');
+    $('es-p').textContent = 'No video files were found. Make sure your drive has video files in folders.';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════
+// SIDEBAR
+// ═══════════════════════════════════════════════════════════
+function buildSidebar() {
+  const nav = $('nav-tabs');
+  nav.innerHTML = '';
+  library.forEach(cat => {
+    const btn = document.createElement('button');
+    btn.className = 'tbtn';
+    btn.dataset.cat = cat.name;
+    btn.textContent = cat.name;
+    btn.title = cat.name;
+    btn.addEventListener('click', () => {
+      $('src').value = '';
+      renderCat(cat.name);
+    });
+    nav.appendChild(btn);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// RENDERING
+// ═══════════════════════════════════════════════════════════
+function showLoad(msg) {
+  $('ls').classList.add('v');
+  $('gv').classList.remove('v');
+  $('sv').classList.remove('v');
+  $('lt').textContent = msg;
+}
+function hideLoad() { $('ls').classList.remove('v'); }
+
+function renderCat(catName) {
+  currentCat = catName;
+  document.querySelectorAll('.tbtn').forEach(b => b.classList.toggle('active', b.dataset.cat === catName));
+  $('sv').classList.remove('v');
+  $('gv').classList.add('v');
+  $('ls').classList.remove('v');
+
+  const cat = library.find(c => c.name === catName);
+  if (!cat) return;
+
+  const q    = $('src').value.trim();
+  const list = (cat.shows || []).filter(s => !q || fuzzyMatch(s.name, q));
+
+  $('gt').innerHTML = `${esc(catName)} <span id="gc">${list.length} title${list.length !== 1 ? 's' : ''}</span>`;
+
+  const grid = $('grid');
+  grid.innerHTML = '';
+
+  if (list.length === 0) {
+    $('es').classList.add('v');
+    $('es-p').textContent = q ? `No results for "${q}"` : `No videos in ${catName}`;
+  } else {
+    $('es').classList.remove('v');
+    list.forEach(show => grid.appendChild(buildCard(show)));
+  }
+}
+
+function fuzzyMatch(title, query) {
+  const t = title.toLowerCase();
+  return query.toLowerCase().split(/\s+/).filter(Boolean).every(w => t.includes(w));
+}
+
+// Calculate the most-recently-watched episode's progress for a show card
+function showCardProg(show) {
+  let best = null;
+  const all = [...show.videos, ...show.seasons.flatMap(s => s.videos)];
+  for (const ep of all) {
+    const p = watchProg[ep.id];
+    if (p && p.pct > 0.03 && p.pct < 0.97) {
+      if (!best || p.ts > best.ts) best = p;
+    }
+  }
+  return best;
+}
+
+function buildCard(show) {
+  const card   = document.createElement('div');
+  card.className = 'card';
+
+  const prog   = showCardProg(show);
+  const pct    = prog ? prog.pct : 0;
+
+  const poster = document.createElement('div');
+  poster.className = 'cp';
+  poster.style.background = gradFor(show.name);
+  poster.innerHTML = `
+    <span style="user-select:none">${esc(initials(show.name))}</span>
+    <div class="cp-ov"></div>
+    <div class="cpb"><div class="cpb-c">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="#111"><polygon points="6,4 20,12 6,20"/></svg>
+    </div></div>
+    ${!show.isMovie ? '<div class="cbadge">Series</div>' : ''}
+    ${pct > 0.03 ? `<div class="cpbar" style="width:${Math.round(pct * 100)}%"></div>` : ''}
+  `;
+
+  if (show.posterHandle) loadPoster(show.posterHandle, poster);
+
+  const info = document.createElement('div');
+  info.className = 'ci';
+
+  let meta = '';
+  if (show.isMovie) {
+    const v = show.videos[0];
+    meta = (v.ext?.toUpperCase() || '') + (v.size ? ' · ' + fmtSz(v.size) : '');
+  } else {
+    meta = `${show.totalEps} episode${show.totalEps !== 1 ? 's' : ''}`;
+  }
+  info.innerHTML = `
+    <div class="cn" title="${esc(show.name)}">${esc(show.name)}</div>
+    <div class="cm">${esc(meta)}</div>
+  `;
+
+  card.appendChild(poster);
+  card.appendChild(info);
+  card.addEventListener('click', () => {
+    // Single-file shows play immediately; multi-episode shows open detail view
+    if (show.isMovie || (show.totalEps === 1 && show.seasons.length === 0)) {
+      openFile(show.videos[0]);
+    } else {
+      openShow(show);
+    }
+  });
+
+  return card;
+}
+
+async function loadPoster(handle, container) {
+  try {
+    const f   = await handle.getFile();
+    const url = URL.createObjectURL(f);
+    const img = new Image();
+    img.onload  = () => { container.querySelector('span')?.remove(); container.insertBefore(img, container.firstChild); };
+    img.onerror = () => URL.revokeObjectURL(url);
+    img.src = url;
+  } catch {}
+}
+
+// ═══════════════════════════════════════════════════════════
+// SHOW DETAIL
+// ═══════════════════════════════════════════════════════════
+function openShow(show) {
+  $('gv').classList.remove('v');
+  $('sv').classList.add('v');
+
+  const sp = $('sp');
+  sp.style.background = gradFor(show.name);
+  sp.innerHTML = `<span style="font-size:26px;font-weight:900;color:rgba(255,255,255,.18)">${esc(initials(show.name))}</span>`;
+  if (show.posterHandle) loadPoster(show.posterHandle, sp);
+
+  $('stitle').textContent = show.name;
+  $('sepc').textContent   = `${show.totalEps} episode${show.totalEps !== 1 ? 's' : ''}`;
+
+  const allEps = [...show.videos, ...show.seasons.flatMap(s => s.videos)];
+  $('spf').style.display = allEps.length ? '' : 'none';
+  $('spf').onclick = () => allEps.length && openFile(allEps[0]);
+
+  const slist = $('slist');
+  slist.innerHTML = '';
+
+  if (show.videos.length > 0)  slist.appendChild(buildSeasonBlock('Episodes', show.videos));
+  show.seasons.forEach(s => slist.appendChild(buildSeasonBlock(s.name, s.videos)));
+}
+
+function buildSeasonBlock(name, episodes) {
+  const block = document.createElement('div');
+  block.className = 'sblock';
+
+  const hdr = document.createElement('div');
+  hdr.className = 'shdr';
+  hdr.innerHTML = `
+    <span class="sname">${esc(name)}</span>
+    <span class="scnt">${episodes.length} ep</span>
+    <span class="sarr">▾</span>
+  `;
+
+  const list = document.createElement('div');
+  list.className = 'elist';
+
+  episodes.forEach((ep, i) => {
+    const prog = watchProg[ep.id];
+    const row  = document.createElement('div');
+    row.className = 'eitem';
+    row.innerHTML = `
+      <span class="enum">${i + 1}</span>
+      <span class="ename" title="${esc(ep.name)}">${esc(ep.name)}</span>
+      <span class="eext">${esc(ep.ext)}</span>
+      <span class="esz">${fmtSz(ep.size)}</span>
+      ${prog && prog.pct > 0.03 && prog.pct < 0.97
+        ? `<div class="epr"><div class="epr-f" style="width:${Math.round(prog.pct * 100)}%"></div></div>`
+        : ''}
+      <span class="eplay">▶</span>
+    `;
+    row.addEventListener('click', () => openFile(ep));
+    list.appendChild(row);
+  });
+
+  hdr.addEventListener('click', () => {
+    hdr.classList.toggle('col');
+    list.style.display = hdr.classList.contains('col') ? 'none' : '';
+  });
+
+  block.appendChild(hdr);
+  block.appendChild(list);
+  return block;
+}
+
+// ═══════════════════════════════════════════════════════════
+// PLAYER
+// ═══════════════════════════════════════════════════════════
+async function openFile(file) {
+  currentFile = file;
+  const vid   = $('vid');
+
+  // Create blob URL on first access
+  if (!blobURLs.has(file.id)) {
+    try {
+      const f = await file.handle.getFile();
+      blobURLs.set(file.id, URL.createObjectURL(f));
+    } catch (e) {
+      toast('Cannot open: ' + e.message);
+      return;
+    }
+  }
+
+  vid.src = '';
+  $('perr').classList.remove('v');
+  $('pf').style.width  = '0%';
+  $('pbb').style.width = '0%';
+  $('ctm').textContent = '0:00 / 0:00';
+  $('i-play').style.display  = '';
+  $('i-pause').style.display = 'none';
+  $('pfn').textContent = file.name;
+
+  vid.src = blobURLs.get(file.id);
+  $('player').classList.add('v');
+  document.body.style.overflow = 'hidden';
+  showUI();
+
+  vid.addEventListener('loadedmetadata', () => {
+    const saved = watchProg[file.id];
+    if (saved && saved.time > 5 && saved.pct < 0.95) vid.currentTime = saved.time;
+    vid.play().catch(() => {});
+  }, { once: true });
+
+  logUsage('play', file.filename);
+}
+
+function closePlayer() {
+  saveProg();
+  const vid = $('vid');
+  vid.pause();
+  vid.src = '';
+  $('player').classList.remove('v');
+  document.body.style.overflow = '';
+  currentFile = null;
+}
+
+function saveProg() {
+  if (!currentFile) return;
+  const vid = $('vid');
+  if (!vid.duration) return;
+  watchProg[currentFile.id] = {
+    time:     vid.currentTime,
+    duration: vid.duration,
+    pct:      vid.currentTime / vid.duration,
+    ts:       Date.now()
+  };
+  localStorage.setItem('sv_wp', JSON.stringify(watchProg));
+}
+
+function showUI() {
+  $('player').classList.add('ui');
+  clearTimeout(uiTimer);
+  uiTimer = setTimeout(() => {
+    if (!$('vid').paused) $('player').classList.remove('ui');
+  }, 3000);
+}
+
+function togglePlay() {
+  const vid = $('vid');
+  vid.paused ? vid.play() : vid.pause();
+}
+function toggleMute() {
+  const vid = $('vid');
+  vid.muted = !vid.muted;
+  $('cvol').value = vid.muted ? 0 : vid.volume;
+  updateVolIcon();
+}
+function updateVolIcon() {
+  const muted = $('vid').muted || $('vid').volume === 0;
+  $('i-vol').style.display  = muted ? 'none' : '';
+  $('i-mute').style.display = muted ? '' : 'none';
+}
+function cycleSpeed() {
+  speedIdx = (speedIdx + 1) % SPEEDS.length;
+  $('vid').playbackRate = SPEEDS[speedIdx];
+  $('cspd').textContent = SPEEDS[speedIdx] + '×';
+}
+function toggleFS() {
+  if (!document.fullscreenElement) $('player').requestFullscreen().catch(() => {});
+  else document.exitFullscreen();
+}
+
+// ═══════════════════════════════════════════════════════════
+// PLAYER EVENTS
+// ═══════════════════════════════════════════════════════════
+function setupPlayer() {
+  const vid = $('vid');
+
+  vid.addEventListener('click',  togglePlay);
+  vid.addEventListener('play',   () => { $('i-play').style.display='none'; $('i-pause').style.display=''; showUI(); });
+  vid.addEventListener('pause',  () => { $('i-play').style.display=''; $('i-pause').style.display='none'; $('player').classList.add('ui'); });
+  vid.addEventListener('error',  () => {
+    if (!vid.src) return;
+    $('perr').classList.add('v');
+    $('errfn').textContent = currentFile?.filename || '';
+  });
+
+  vid.addEventListener('timeupdate', () => {
+    if (!vid.duration) return;
+    const pct = vid.currentTime / vid.duration;
+    $('pf').style.width  = (pct * 100) + '%';
+    $('ctm').textContent = fmt(vid.currentTime) + ' / ' + fmt(vid.duration);
+    if (Math.floor(vid.currentTime) % 5 === 0) saveProg();
+  });
+
+  vid.addEventListener('progress', () => {
+    if (vid.buffered.length && vid.duration)
+      $('pbb').style.width = (vid.buffered.end(vid.buffered.length - 1) / vid.duration * 100) + '%';
+  });
+
+  vid.addEventListener('ended', () => {
+    if (!currentFile) return;
+    watchProg[currentFile.id] = { time: vid.duration, duration: vid.duration, pct: 1, ts: Date.now() };
+    localStorage.setItem('sv_wp', JSON.stringify(watchProg));
+  });
+
+  // Progress bar scrubbing
+  let scrubbing = false;
+  function scrubTo(e) {
+    const r = $('pt').getBoundingClientRect();
+    const p = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    if (scrubbing) $('pf').style.width = (p * 100) + '%';
+    vid.currentTime = p * (vid.duration || 0);
+    // tooltip
+    $('ptt').textContent = fmt(p * (vid.duration || 0));
+    $('ptt').style.left = (p * 100) + '%';
+  }
+  $('pbw').addEventListener('mousedown', e => { scrubbing = true; scrubTo(e); });
+  $('pbw').addEventListener('mousemove', e => {
+    const r = $('pt').getBoundingClientRect();
+    const p = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width));
+    $('ptt').textContent = fmt(p * (vid.duration || 0));
+    $('ptt').style.left  = (p * 100) + '%';
+    if (scrubbing) scrubTo(e);
+  });
+  document.addEventListener('mouseup', e => {
+    if (scrubbing) { scrubbing = false; scrubTo(e); }
+  });
+
+  $('player').addEventListener('mousemove', showUI);
+  $('pcl').addEventListener('click',   closePlayer);
+  $('cplay').addEventListener('click', togglePlay);
+  $('cb10').addEventListener('click',  () => { $('vid').currentTime = Math.max(0, $('vid').currentTime - 10); showUI(); });
+  $('cf10').addEventListener('click',  () => { $('vid').currentTime = Math.min($('vid').duration || 0, $('vid').currentTime + 10); showUI(); });
+  $('cmute').addEventListener('click', toggleMute);
+  $('cvol').addEventListener('input',  e => { $('vid').volume = +e.target.value; $('vid').muted = +e.target.value === 0; updateVolIcon(); });
+  $('cspd').addEventListener('click',  cycleSpeed);
+  $('cfs').addEventListener('click',   toggleFS);
+}
+
+// ═══════════════════════════════════════════════════════════
+// KEYBOARD
+// ═══════════════════════════════════════════════════════════
+function setupKeys() {
+  document.addEventListener('keydown', e => {
+    if (e.target.tagName === 'INPUT') return;
+    const inPlayer = $('player').classList.contains('v');
+    switch (e.key) {
+      case 'Escape':
+        if (inPlayer) { e.preventDefault(); closePlayer(); }
+        break;
+      case ' ': case 'k':
+        if (inPlayer) { e.preventDefault(); togglePlay(); }
+        break;
+      case 'ArrowLeft':
+        if (inPlayer) { e.preventDefault(); $('vid').currentTime = Math.max(0, $('vid').currentTime - (e.shiftKey ? 30 : 10)); showUI(); }
+        break;
+      case 'ArrowRight':
+        if (inPlayer) { e.preventDefault(); $('vid').currentTime = Math.min($('vid').duration || 0, $('vid').currentTime + (e.shiftKey ? 30 : 10)); showUI(); }
+        break;
+      case 'ArrowUp':
+        if (inPlayer) { e.preventDefault(); $('vid').volume = Math.min(1, $('vid').volume + 0.1); $('cvol').value = $('vid').volume; updateVolIcon(); }
+        break;
+      case 'ArrowDown':
+        if (inPlayer) { e.preventDefault(); $('vid').volume = Math.max(0, $('vid').volume - 0.1); $('cvol').value = $('vid').volume; updateVolIcon(); }
+        break;
+      case 'f': case 'F':
+        if (inPlayer) toggleFS();
+        break;
+      case 'm': case 'M':
+        if (inPlayer) toggleMute();
+        break;
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// SEARCH
+// ═══════════════════════════════════════════════════════════
+function setupSearch() {
+  $('src').addEventListener('input', () => {
+    // If in show detail, filter episodes; otherwise filter grid
+    if ($('sv').classList.contains('v')) {
+      const q = $('src').value.trim().toLowerCase();
+      document.querySelectorAll('.eitem').forEach(el => {
+        const n = el.querySelector('.ename')?.textContent.toLowerCase() || '';
+        el.style.display = (!q || n.includes(q)) ? '' : 'none';
+      });
+    } else if (currentCat) {
+      renderCat(currentCat);
+    }
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// NAV
+// ═══════════════════════════════════════════════════════════
+function setupNav() {
+  $('sb').addEventListener('click', () => {
+    $('sv').classList.remove('v');
+    $('gv').classList.add('v');
+  });
+
+  $('rescan').addEventListener('click', () => {
+    if (rootHandle) scanLibrary();
+  });
+
+  $('logo').addEventListener('click', () => {
+    $('sv').classList.remove('v');
+    $('gv').classList.add('v');
+    if (currentCat) renderCat(currentCat);
+  });
+}
+
+// ═══════════════════════════════════════════════════════════
+// BOOT / DRIVE CONNECTION
+// ═══════════════════════════════════════════════════════════
+async function boot() {
+  watchProg = JSON.parse(localStorage.getItem('sv_wp') || '{}');
+  await openDB();
+
+  const drive = detectDrive();
+  $('dlabel').textContent  = drive + 'startup.html';
+  $('sbtn').textContent    = `Connect ${drive}`;
+
+  // Try to restore a previously-granted directory handle
+  const saved = await dbGet('root');
+  if (saved) {
+    try {
+      let perm = await saved.queryPermission({ mode: 'readwrite' });
+      if (perm === 'granted') { await connectWith(saved); return; }
+      if (perm === 'prompt') {
+        $('setup').querySelector('h2').textContent = 'Welcome Back!';
+        $('setup').querySelector('p').textContent  = 'Click below to reconnect to your drive.';
+        $('sbtn').textContent  = `Reconnect ${drive}`;
+        $('sbtn').onclick = async () => {
+          try {
+            if (await saved.requestPermission({ mode: 'readwrite' }) === 'granted') {
+              await connectWith(saved); return;
+            }
+          } catch {}
+          pickDrive();
+        };
+        return;
+      }
+    } catch {}
+  }
+
+  $('sbtn').onclick = pickDrive;
+}
+
+async function pickDrive() {
+  if (!window.showDirectoryPicker) {
+    $('serr').textContent    = 'Requires Chrome or Edge 86+. Firefox is not supported.';
+    $('serr').style.display  = 'block';
+    return;
+  }
+  try {
+    const h = await showDirectoryPicker({ mode: 'readwrite' });
+    await dbSet('root', h);
+    await connectWith(h);
+  } catch (e) {
+    if (e.name !== 'AbortError') {
+      $('serr').textContent   = 'Error: ' + e.message;
+      $('serr').style.display = 'block';
+    }
+  }
+}
+
+async function connectWith(h) {
+  rootHandle = h;
+  $('setup').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  $('badge').textContent = h.name;
+  await scanLibrary();
+  logUsage('page_load');
+}
+
+// ═══════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  setupPlayer();
+  setupKeys();
+  setupSearch();
+  setupNav();
+  boot();
+});
+</script>
+</body>
+</html>
