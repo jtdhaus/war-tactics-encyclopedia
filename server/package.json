@@ -1,0 +1,11 @@
+{
+  "name": "streamserver",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build": "pkg index.js --targets node18-win-x64 --output server.exe"
+  },
+  "devDependencies": {
+    "pkg": "^5.8.1"
+  }
+}
